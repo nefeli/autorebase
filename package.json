@@ -2,9 +2,10 @@
   "dependencies": {
     "debug": "^4.1.1",
     "github-rebase": "^1.0.0",
-    "probot-serverless-now": "^1.0.1",
+    "probot": "^8.0.0-beta.1",
     "promise-retry": "^1.1.1",
-    "shared-github-internals": "^1.0.0"
+    "shared-github-internals": "^1.0.0",
+    "typescript": "^3.2.4"
   },
   "description": "GitHub App to automatically rebase and merge pull requests",
   "devDependencies": {
@@ -20,12 +21,10 @@
     "jest-circus": "^23.6.0",
     "jest-junit": "^6.0.1",
     "prettier": "^1.15.3",
-    "probot": "^8.0.0-beta.1",
     "smee-client": "^1.0.2",
     "ts-jest": "^23.10.5",
     "tslint": "^5.12.1",
-    "tslint-config-prettier": "^1.17.0",
-    "typescript": "^3.2.4"
+    "tslint-config-prettier": "^1.17.0"
   },
   "engines": {
     "node": ">= 8.10.0"
