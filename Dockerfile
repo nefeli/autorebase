@@ -11,5 +11,5 @@ RUN yarn install
 COPY . .
 RUN tsc
 
-ENTRYPOINT ["probot", "receive"]
+ENTRYPOINT ["probot", "run"]
 CMD ["/app/src/index.js"]

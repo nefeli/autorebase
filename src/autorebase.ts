@@ -248,7 +248,7 @@ const autorebasePullRequest = async ({
       repo,
     });
   }
-  if (pullRequest.mergeableState === "clean" || pullRequest.mergeableState === "unstable") {
+  if (pullRequest.mergeableState === "clean") {
     return merge({
       debug,
       head: pullRequest.head,
