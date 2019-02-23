@@ -22,6 +22,10 @@ import {
   giveUp,
 } from "./utils";
 
+import {
+  commentDog,
+} from "./dogs";
+
 /**
  * When Autorebase tries to rebase a pull request that doesn't have the label anymore.
  */
@@ -105,6 +109,7 @@ const merge = async ({
     owner,
     repo,
   });
+  commentDog({ debug, octokit, owner, pullRequestNumber, repo })
   debug("merged", pullRequestNumber);
   debug("deleting reference", head);
   await deleteRef({ octokit, owner, ref: head, repo });
