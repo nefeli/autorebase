@@ -18,6 +18,8 @@ import {
   LabelName,
   PullRequestInfo,
   withLabelLock,
+  maybeGiveUp,
+  giveUp,
 } from "./utils";
 
 /**
@@ -158,11 +160,15 @@ const rebase = async ({
   } catch (error) {
     const message = "rebase failed";
     debug(message, error);
-    await octokit.issues.createComment({
-      body: [`The rebase failed:`, "", "```", error.message, "```"].join("\n"),
-      number: pullRequestNumber,
+
+    giveUp({
+      debug,
+      label,
+      octokit,
       owner,
+      pullRequestNumber,
       repo,
+      err: "Merge conflict during rebase"
     });
     throw new Error(message);
   }
@@ -184,6 +190,25 @@ const findAndRebasePullRequestOnSameBase = async ({
   repo: RepoName;
 }): Promise<AbortAction | RebaseAction | NopAction> => {
   debug("searching for pull request to rebase on same base", base);
+  const dirtyPR = await findOldestPullRequest({
+    debug,
+    extraSearchQualifiers: `base:${base}`,
+    label,
+    octokit,
+    owner,
+    predicate: ({ mergeableState }) => mergeableState === "dirty",
+    repo,
+  });
+  if (dirtyPR) {
+    await maybeGiveUp({
+      debug,
+      label,
+      octokit,
+      owner,
+      pullRequestNumber: dirtyPR.pullRequestNumber,
+      repo
+    });
+  }
   const pullRequest = await findOldestPullRequest({
     debug,
     extraSearchQualifiers: `base:${base}`,
@@ -296,6 +321,14 @@ const autorebase = async ({
 
     if (pullRequest) {
       debug("autorebaseable pull request matching sha", pullRequest);
+      await maybeGiveUp({
+        debug,
+        label,
+        octokit,
+        owner,
+        pullRequestNumber: pullRequest.pullRequestNumber,
+        repo
+      });
       if (pullRequest.mergeableState === "clean") {
         return merge({
           debug,
@@ -357,6 +390,14 @@ const autorebase = async ({
       name,
     });
 
+    await maybeGiveUp({
+      debug,
+      label,
+      octokit,
+      owner,
+      pullRequestNumber,
+      repo
+    });
     if (
       isAutorebaseSamePullRequestEvent ||
       isRebasePullRequestOnSameBaseEvent ||

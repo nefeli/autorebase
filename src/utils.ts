@@ -30,6 +30,7 @@ type MergeableState =
 type PullRequestInfo = {
   base: Ref;
   head: Ref;
+  labeledAndOpened: boolean;
   labeledAndOpenedAndRebaseable: boolean;
   mergeableState: MergeableState;
   merged: boolean;
@@ -76,6 +77,9 @@ const getPullRequestInfo = ({
   return {
     base,
     head,
+    labeledAndOpened:
+      labels.map(({ name }) => name).includes(label) &&
+      closedAt === null,
     labeledAndOpenedAndRebaseable:
       labels.map(({ name }) => name).includes(label) &&
       closedAt === null &&
@@ -321,6 +325,135 @@ const withLabelLock = async ({
   return true;
 };
 
+const maybeGiveUp = async ({
+  debug,
+  label,
+  octokit,
+  owner,
+  pullRequestNumber,
+  repo,
+}: {
+  debug: Debug;
+  label: LabelName;
+  octokit: Octokit;
+  owner: RepoOwner;
+  pullRequestNumber: PullRequestNumber;
+  repo: RepoName;
+}) => {
+  const pullRequest = await getPullRequestInfoWithKnownMergeableState({
+    debug,
+    label,
+    octokit,
+    owner,
+    pullRequestNumber,
+    repo,
+    });
+  debug("pull request info for maybeGiveUp", pullRequest);
+
+  var gu = (err: string) => {
+    giveUp({
+      debug,
+      label,
+      octokit,
+      owner,
+      pullRequestNumber,
+      repo,
+      err
+    });
+  };
+
+  if (!pullRequest.labeledAndOpened) {
+    return;
+  }
+
+  if (pullRequest.mergeableState === "dirty") {
+    await gu("Conflicting files");
+    return;
+  }
+
+  if (pullRequest.mergeableState === "blocked") {
+    // are we blocked by a failed jenkins run?
+    const status = await octokit.repos.getCombinedStatusForRef({
+      owner,
+      repo,
+      ref: pullRequest.sha,
+    });
+    debug("status check for blocked PR", status);
+    if (status.data.state === "failure") {
+      await gu("Blocked by jenkins");
+      return;
+    }
+
+    // need to check if blocked by missing or negative reviews
+    const reviews = await octokit.pulls.listReviews({
+      owner,
+      repo,
+      number: pullRequestNumber,
+    });
+    debug("review check for blocked PR", reviews);
+    if (reviews.data.length === 0) {
+      await gu("Wait for reviews");
+      return;
+    } else {
+      var passing = false;
+      for (var i = 0; i < reviews.data.length; i++) {
+        if (reviews.data[i].state === "CHANGES_REQUESTED") {
+          await gu("Address reviewer comments");
+          return;
+        }
+        if (reviews.data[i].state === "APPROVED") {
+          passing = true;
+        }
+      }
+      if (!passing) { // probably a dismissed review
+        await gu("Wait for reviews");
+        return;
+      }
+    }
+  }
+};
+
+const giveUp = async ({
+  debug,
+  label,
+  octokit,
+  owner,
+  pullRequestNumber,
+  repo,
+  err,
+}: {
+  debug: Debug;
+  label: LabelName;
+  octokit: Octokit;
+  owner: RepoOwner;
+  pullRequestNumber: PullRequestNumber;
+  repo: RepoName;
+  err: string;
+}) => {
+  debug("giving up... writing comment on PR: ", err);
+  await octokit.issues.createComment({
+    owner: owner,
+    repo: repo,
+    number: pullRequestNumber,
+    body: ['<h2><p align="center">:construction: :construction_worker: :fire: Giving up on autorebase, please investigate: :fire: :construction_worker: :construction:</p>',
+    "",
+    '<p align="center">:rotating_light: ' + err + ' :rotating_light:</p></h2>',
+    "",
+    ].join("\n"),
+  });
+  try {
+    debug("removing label", pullRequestNumber);
+    await octokit.issues.removeLabel({
+      name: label,
+      number: pullRequestNumber,
+      owner,
+      repo,
+    });
+  } catch (error) {
+    debug("label already acquired by another process", pullRequestNumber);
+  }
+};
+
 export {
   Debug,
   findAutorebaseablePullRequestMatchingSha,
@@ -331,4 +464,6 @@ export {
   sleep,
   waitForKnownMergeableState,
   withLabelLock,
+  maybeGiveUp,
+  giveUp,
 };
