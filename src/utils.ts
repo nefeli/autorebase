@@ -382,6 +382,9 @@ const maybeGiveUp = async ({
     if (status.data.state === "failure") {
       await gu("Blocked by jenkins");
       return;
+    } else if (status.data.state === "pending") {
+      debug("jenkins still pending... letting jenkins finish");
+      return;
     }
 
     // need to check if blocked by missing or negative reviews
