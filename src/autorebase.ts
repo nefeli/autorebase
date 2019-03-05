@@ -1,6 +1,6 @@
 import * as Octokit from "@octokit/rest";
 import * as createDebug from "debug";
-import { needAutosquashing, rebasePullRequest } from "github-rebase";
+import { needAutosquashing, rebasePullRequest } from "../github-rebase/src/index";
 import {
   deleteRef,
   PullRequestNumber,

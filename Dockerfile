@@ -8,6 +8,14 @@ COPY yarn.lock .
 COPY package.json .
 RUN yarn install
 
+COPY ./github-rebase/yarn.lock ./github-rebase/
+COPY ./github-rebase/package.json ./github-rebase/
+RUN cd github-rebase && yarn install
+
+COPY ./github-rebase/shared-github-internals/yarn.lock ./github-rebase/shared-github-internals/
+COPY ./github-rebase/shared-github-internals/package.json ./github-rebase/shared-github-internals/
+RUN cd github-rebase/shared-github-internals && yarn install
+
 COPY . .
 RUN tsc
 
